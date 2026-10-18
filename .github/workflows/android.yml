@@ -1,0 +1,73 @@
+name: Shelter Profile Bridge checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: shelter-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: recursive
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: 'platform-tools'
+      - run: sdkmanager 'platforms;android-35' 'platforms;android-34' 'build-tools;35.0.0'
+      - name: Restore dedicated fork test signing key
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' }}
+        env:
+          KEY_B64: ${{ secrets.SHELTER_TEST_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.SHELTER_TEST_STORE_PASSWORD }}
+        run: |
+          test -n "$KEY_B64"
+          test -n "$STORE_PASSWORD"
+          umask 077
+          printf '%s' "$KEY_B64" | base64 --decode > "$RUNNER_TEMP/shelter-test.jks"
+          printf 'SHELTER_TEST_KEYSTORE=%s\n' "$RUNNER_TEMP/shelter-test.jks" >> "$GITHUB_ENV"
+          printf 'SHELTER_TEST_STORE_PASSWORD=%s\n' "$STORE_PASSWORD" >> "$GITHUB_ENV"
+      - name: Unit tests, lint and APKs
+        run: bash ./gradlew :app:testDebugUnitTest :app:lintDebug :app:lintRelease :app:assembleDebug :app:assembleRelease --no-daemon --max-workers=2
+      - name: Prepare artifact
+        run: |
+          mkdir -p ci-artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk ci-artifacts/shelter-profile-bridge-test.apk
+          cp app/build/outputs/apk/release/app-release-unsigned.apk ci-artifacts/shelter-profile-bridge-release-unsigned.apk
+          cp LICENSE ci-artifacts/LICENSE
+          printf 'source=https://github.com/%s\ncommit=%s\nrun=%s\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_RUN_ID" > ci-artifacts/BUILD.txt
+          cd ci-artifacts
+          sha256sum *.apk > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: shelter-profile-bridge-apks-${{ github.run_number }}
+          path: ci-artifacts/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: shelter-profile-bridge-reports-${{ github.run_number }}
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Remove temporary signing key
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/shelter-test.jks"

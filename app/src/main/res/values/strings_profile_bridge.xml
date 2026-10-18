@@ -1,0 +1,6 @@
+<resources>
+    <string name="settings_profile_bridge">Allow Profile Bridge cross-profile access</string>
+    <string name="settings_profile_bridge_desc">Allow only dev.profilebridge.app in the administrator cross-profile list. Install the same Profile Bridge APK in both profiles, then grant user consent in Android settings from Profile Bridge. Turning this off removes only this app from the administrator list; other entries are preserved. This does not grant access to Samsung Secure Folder.</string>
+    <string name="settings_profile_bridge_requires_r">Requires Android 11 or newer and an active Shelter work profile.</string>
+    <string name="settings_profile_bridge_failure">Could not confirm the work-profile policy. Reopen settings to refresh. No automatic permission grant is performed.</string>
+</resources>

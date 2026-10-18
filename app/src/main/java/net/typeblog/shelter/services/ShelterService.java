@@ -10,6 +10,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Binder;
+import android.os.Process;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -24,6 +26,7 @@ import net.typeblog.shelter.util.ApplicationInfoWrapper;
 import net.typeblog.shelter.util.FileProviderProxy;
 import net.typeblog.shelter.util.UriForwardProxy;
 import net.typeblog.shelter.util.Utility;
+import net.typeblog.shelter.util.ProfileBridgeAllowlist;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -48,6 +51,7 @@ public class ShelterService extends Service {
     // Note that this proxy can only start activity that is accessible to the
     // main profile and within the application itself.
     private IStartActivityProxy mStartActivityProxy = null;
+    private final Object mCrossProfilePolicyLock = new Object();
     private IShelterService.Stub mBinder = new IShelterService.Stub() {
         @Override
         public void ping() {
@@ -290,9 +294,46 @@ public class ShelterService extends Service {
                 throw new IllegalStateException("Cannot access cross-profile packages without being profile owner");
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R)
                 throw new IllegalStateException("Cross-profile packages support is only available on Android 11 and later");
-            mPolicyManager.setCrossProfilePackages(mAdminComponent, new HashSet<>(packages));
+            synchronized (mCrossProfilePolicyLock) {
+                mPolicyManager.setCrossProfilePackages(mAdminComponent, new HashSet<>(packages));
+            }
+        }
+
+        @Override
+        public boolean isProfileBridgeAllowed() {
+            enforceBridgePolicyCaller();
+            synchronized (mCrossProfilePolicyLock) {
+                return mPolicyManager.getCrossProfilePackages(mAdminComponent)
+                        .contains(ProfileBridgeAllowlist.PACKAGE);
+            }
+        }
+
+        @Override
+        public boolean setProfileBridgeAllowed(boolean enabled) {
+            enforceBridgePolicyCaller();
+            synchronized (mCrossProfilePolicyLock) {
+                // Re-read authoritative policy; never replace it with a stale UI snapshot.
+                mPolicyManager.setCrossProfilePackages(mAdminComponent,
+                        ProfileBridgeAllowlist.updated(
+                                mPolicyManager.getCrossProfilePackages(mAdminComponent), enabled));
+                return mPolicyManager.getCrossProfilePackages(mAdminComponent)
+                        .contains(ProfileBridgeAllowlist.PACKAGE) == enabled;
+            }
         }
     };
+
+    private void enforceBridgePolicyCaller() {
+        int caller = Binder.getCallingUid();
+        String[] packages = mPackageManager.getPackagesForUid(caller);
+        boolean samePackage = packages != null && java.util.Arrays.asList(packages).contains(getPackageName());
+        if (!samePackage || mPackageManager.checkSignatures(caller, Process.myUid())
+                != PackageManager.SIGNATURE_MATCH) {
+            throw new SecurityException("Caller not authorized for bridge policy");
+        }
+        if (!mIsProfileOwner || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            throw new IllegalStateException("Bridge policy requires Android 11+ profile owner");
+        }
+    }
 
     @Override
     public void onCreate() {

@@ -41,6 +41,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements Prefer
     private static final String SETTINGS_AUTO_FREEZE_DELAY = "settings_auto_freeze_delay";
     private static final String SETTINGS_SKIP_FOREGROUND = "settings_dont_freeze_foreground";
     private static final String SETTINGS_PAYMENT_STUB = "settings_payment_stub";
+    private static final String SETTINGS_PROFILE_BRIDGE = "settings_profile_bridge";
 
     private static final int[] AUTO_FREEZE_DELAY_SECONDS = new int[]{0, 60, 2 * 60, 5 * 60};
 
@@ -52,6 +53,8 @@ public class SettingsFragment extends PreferenceFragmentCompat implements Prefer
     private CheckBoxPreference mPrefAutoFreezeService = null;
     private CheckBoxPreference mPrefSkipForeground = null;
     private CheckBoxPreference mPrefPaymentStub = null;
+    private CheckBoxPreference mPrefProfileBridge = null;
+    private boolean mBridgePolicyBusy = false;
 
     private DropDownPreference mPrefAutoFreezeDelay = null;
 
@@ -91,6 +94,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements Prefer
                 .setOnPreferenceClickListener(this::openSummaryUrl);
 
         // === Interactions ===
+        mPrefProfileBridge = findPreference(SETTINGS_PROFILE_BRIDGE);
+        mPrefProfileBridge.setEnabled(false);
+        mPrefProfileBridge.setOnPreferenceChangeListener(this);
         mPrefCrossProfileFileChooser = (CheckBoxPreference) findPreference(SETTINGS_CROSS_PROFILE_FILE_CHOOSER);
         mPrefCrossProfileFileChooser.setChecked(mManager.getCrossProfileFileChooserEnabled());
         mPrefCrossProfileFileChooser.setOnPreferenceChangeListener(this);
@@ -136,6 +142,45 @@ public class SettingsFragment extends PreferenceFragmentCompat implements Prefer
         // Update all preferences that may change when returning
         // i.e. preferences that open another dialog for picking
         updateAutoFreezeDelay();
+        refreshBridgePolicy();
+    }
+
+    private void refreshBridgePolicy() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            mPrefProfileBridge.setEnabled(false);
+            mPrefProfileBridge.setSummary(R.string.settings_profile_bridge_requires_r);
+            return;
+        }
+        changeBridgePolicy(null);
+    }
+
+    // Binder/DPC I/O off main thread. Checkbox reflects only confirmed policy readback.
+    private void changeBridgePolicy(@Nullable Boolean enabled) {
+        if (mBridgePolicyBusy || mServiceWork == null) return;
+        mBridgePolicyBusy = true;
+        mPrefProfileBridge.setEnabled(false);
+        final android.app.Activity activity = requireActivity();
+        final IShelterService service = mServiceWork;
+        new Thread(() -> {
+            Boolean actual = null;
+            boolean confirmed = enabled == null;
+            try {
+                if (enabled != null) confirmed = service.setProfileBridgeAllowed(enabled);
+                actual = service.isProfileBridgeAllowed();
+            } catch (RemoteException | RuntimeException ignored) {
+                // No arbitrary platform errors or payload in logs/UI.
+            }
+            final Boolean state = actual;
+            final boolean success = confirmed && state != null;
+            activity.runOnUiThread(() -> {
+                mBridgePolicyBusy = false;
+                if (!isAdded() || getActivity() != activity) return;
+                if (state != null) mPrefProfileBridge.setChecked(state);
+                mPrefProfileBridge.setSummary(success ? R.string.settings_profile_bridge_desc
+                        : R.string.settings_profile_bridge_failure);
+                mPrefProfileBridge.setEnabled(state != null);
+            });
+        }, "bridge-policy").start();
     }
 
     private void updateAutoFreezeDelay() {
@@ -151,6 +196,10 @@ public class SettingsFragment extends PreferenceFragmentCompat implements Prefer
 
     @Override
     public boolean onPreferenceChange(Preference preference, Object newState) {
+        if (preference == mPrefProfileBridge) {
+            changeBridgePolicy((boolean) newState);
+            return false; // Worker updates UI only after policy readback.
+        }
         if (preference == mPrefCrossProfileFileChooser) {
             boolean enabled = (boolean) newState;
             if (!enabled) {

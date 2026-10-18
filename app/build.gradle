@@ -27,7 +27,7 @@ def getVersionName = { ->
     try {
         def stdout = new ByteArrayOutputStream()
         exec {
-            commandLine 'git', 'describe', '--tags', '--dirty'
+            commandLine 'git', 'describe', '--tags', '--always', '--dirty'
             standardOutput = stdout
         }
         return stdout.toString().trim()
@@ -48,7 +48,23 @@ android {
         versionName getVersionName()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
+    signingConfigs {
+        forkTest {
+            if (System.getenv('SHELTER_TEST_KEYSTORE')) {
+                storeFile file(System.getenv('SHELTER_TEST_KEYSTORE'))
+                storePassword System.getenv('SHELTER_TEST_STORE_PASSWORD')
+                keyAlias 'shelter-fork-test'
+                keyPassword System.getenv('SHELTER_TEST_STORE_PASSWORD')
+            }
+        }
+    }
     buildTypes {
+        debug {
+            versionNameSuffix '-profile-bridge-test'
+            if (System.getenv('SHELTER_TEST_KEYSTORE')) {
+                signingConfig signingConfigs.forkTest
+            }
+        }
         release {
             minifyEnabled true
             shrinkResources true

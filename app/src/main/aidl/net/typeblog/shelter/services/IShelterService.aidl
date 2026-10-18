@@ -28,4 +28,6 @@ interface IShelterService {
     void setStartActivityProxy(in IStartActivityProxy proxy);
     List<String> getCrossProfilePackages();
     void setCrossProfilePackages(in List<String> packages);
+    boolean isProfileBridgeAllowed();
+    boolean setProfileBridgeAllowed(boolean enabled);
 }
