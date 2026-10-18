@@ -1,5 +1,24 @@
 # Fork validation
 
+## Confirmed GitHub Actions build
+
+- APK commit: 95b591e; feature commit 52f8d2a; author/committer d3TaL.
+- Run: https://github.com/d3TaL/shelter-profile-bridge/actions/runs/39169534585 — SUCCESS.
+- testDebugUnitTest PASS: 2 meaningful allowlist tests plus upstream example test.
+- lintDebug / lintRelease: 0 errors, 77 existing warnings; reports downloaded.
+  Warnings remain visible; no general baseline or global new suppression.
+- assembleDebug / assembleRelease PASS; release R8 enabled, unsigned.
+- APK: /storage/emulated/0/Download/artifacts/shelter-profile-bridge-95b591e-test.apk
+- APK SHA-256: 7d8522f09f13dfaf6290155e7ed939be71227fd2a49593c54395f735f0d25617
+- Original artifact directory: shelter-run-39169534585/shelter-profile-bridge-apks-2/.
+  Both APK SHA256SUMS checks PASS.
+- APK signature verified with apksig 9.4.1: valid, no verification errors.
+  Fork TEST certificate SHA-256:
+  cf254e96413064d0d97ff5bd060451bc34e6839ee9f6d6880d56557a3fef7620
+- This differs from installed Shelter certificate below. No update/install or
+  profile removal attempted. Physical policy change, cross-profile caller
+  authentication and revocation remain untested on a fork-controlled profile.
+
 ## Initial iteration
 
 - Fork checkout and SetupWizardLibrary submodule fetched; upstream license GPLv3 retained.

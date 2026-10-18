@@ -49,3 +49,9 @@ Uninstalling
 ===
 
 To uninstall Shelter, please delete the work profile first in Settings -> Accounts, and then uninstall the Shelter app normally.
+# Profile Bridge fork
+
+This fork adds a user-controlled, fixed-package Profile Bridge allowlist setting.
+See [integration, existing upstream option and installation limits](docs/PROFILE_BRIDGE.md)
+and [actual build validation](docs/VALIDATION.md). Upstream attribution and GPLv3
+license are retained. Test APKs are not signed with the installed upstream key.
