@@ -13,6 +13,12 @@
 - The upstream app context menu already offers the underlying allowlist action.
   This corrects the earlier assumption that no upstream UI exists.
 - CI/build result and fork signing certificate to be recorded after actual run.
+- CI 39169194635: unit tests PASS; lint found 4 new API guard visibility
+  errors and 3 upstream errors (missing column index check and DPC
+  systemExempted exact-alarm inference). Added direct API guards, column index
+  check, and two per-service lint annotations documenting existing profile-owner
+  eligibility. No new alarm permission, no change to existing FGS types and no
+  global lint baseline. Runtime FGS eligibility remains platform-enforced.
 - Initial local Gradle attempt stopped before task execution: Android SDK not
   installed. No APK built locally. Per owner instruction all further tests,
   lint and builds use GitHub Actions only.

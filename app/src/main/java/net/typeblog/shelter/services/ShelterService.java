@@ -302,6 +302,9 @@ public class ShelterService extends Service {
         @Override
         public boolean isProfileBridgeAllowed() {
             enforceBridgePolicyCaller();
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                throw new IllegalStateException("Requires Android 11");
+            }
             synchronized (mCrossProfilePolicyLock) {
                 return mPolicyManager.getCrossProfilePackages(mAdminComponent)
                         .contains(ProfileBridgeAllowlist.PACKAGE);
@@ -311,6 +314,9 @@ public class ShelterService extends Service {
         @Override
         public boolean setProfileBridgeAllowed(boolean enabled) {
             enforceBridgePolicyCaller();
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                throw new IllegalStateException("Requires Android 11");
+            }
             synchronized (mCrossProfilePolicyLock) {
                 // Re-read authoritative policy; never replace it with a stale UI snapshot.
                 mPolicyManager.setCrossProfilePackages(mAdminComponent,
